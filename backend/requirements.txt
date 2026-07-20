@@ -1,0 +1,14 @@
+fastapi==0.139.2
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+pydantic==2.10.4
+alembic==1.14.0
+psycopg[binary]==3.2.3
+python-dotenv==1.0.1
+pytest==8.3.4
+httpx==0.28.1
+
+# Bonus: async pipeline execution via a self-hosted Prefect flow + worker
+# (see app/pipeline/prefect_flow.py). Bumped fastapi above from 0.115.6 to
+# satisfy prefect's dependency resolution; verified against the full test suite.
+prefect==3.7.8

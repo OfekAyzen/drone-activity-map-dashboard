@@ -1,0 +1,4 @@
+drone_id,drone_type,operator_id,latitude,longitude,altitude_m,speed_kmh,battery_percent,timestamp,status
+DRONE-006,Quadcopter,OP-789,32.0500,34.7700,110,50,88,2026-06-28T11:10:00Z,active
+DRONE-007,VTOL,OP-123,31.8000,35.1000,180,60,5,2026-06-28T11:15:00Z,active
+,Quadcopter,OP-123,32.0000,34.8000,100,40,70,2026-06-28T11:20:00Z,active

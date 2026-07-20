@@ -1,0 +1,30 @@
+<section class="pipeline-panel">
+  <div class="header-row">
+    <h3>Data Pipeline</h3>
+    <button type="button" [disabled]="triggering" (click)="runPipeline.emit()">
+      {{ triggering ? 'Running…' : 'Run Pipeline' }}
+    </button>
+  </div>
+
+  <table class="runs-table" *ngIf="runs.length; else empty">
+    <thead>
+      <tr>
+        <th>Started</th>
+        <th>Status</th>
+        <th>Valid</th>
+        <th>Invalid</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let run of runs">
+        <td>{{ formatDate(run.started_at) }}</td>
+        <td><span class="badge" [class]="run.status">{{ run.status }}</span></td>
+        <td>{{ run.valid_records }}</td>
+        <td>{{ run.invalid_records }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <ng-template #empty>
+    <p class="empty-state">No pipeline runs yet.</p>
+  </ng-template>
+</section>

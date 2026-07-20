@@ -1,0 +1,48 @@
+<div class="shell">
+  <header class="app-header">
+    <h1>Drone Activity Map Dashboard</h1>
+  </header>
+
+  <aside class="sidebar">
+    <app-filter-panel (apply)="onApplyFilters($event)" (reset)="onResetFilters()" />
+
+    <div class="view-toggle">
+      <label>
+        <input type="checkbox" [checked]="store.latestOnly()" (change)="store.toggleLatestOnly()" />
+        Show latest position per drone only
+      </label>
+    </div>
+
+    <div class="selection-panel" *ngIf="store.selectedDroneId() as droneId">
+      <p>
+        Path history: <strong>{{ droneId }}</strong>
+        <button type="button" (click)="store.clearSelection()">Clear</button>
+      </p>
+    </div>
+
+    <p class="error" *ngIf="store.error()">{{ store.error() }}</p>
+
+    <div class="pagination">
+      <button type="button" (click)="onPrevPage()" [disabled]="store.offset() === 0">Prev</button>
+      <span>{{ store.offset() + 1 }}-{{ store.offset() + store.visibleItems().length }} of {{ store.total() }}</span>
+      <button type="button" (click)="onNextPage()" [disabled]="store.offset() + store.limit() >= store.total()">
+        Next
+      </button>
+    </div>
+
+    <app-pipeline-panel
+      [runs]="store.runs()"
+      [triggering]="store.triggering()"
+      (runPipeline)="store.runPipeline()"
+    />
+  </aside>
+
+  <main class="map-area">
+    <app-map
+      [points]="store.visibleItems()"
+      [pathPoints]="store.pathPoints()"
+      (droneSelected)="onDroneSelected($event)"
+    />
+    <div class="loading-overlay" *ngIf="store.loading()">Loading…</div>
+  </main>
+</div>

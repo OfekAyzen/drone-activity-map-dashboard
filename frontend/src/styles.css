@@ -1,0 +1,24 @@
+/* Keep these in sync with src/app/shared/status-colors.ts */
+:root {
+  --status-active: #16a34a;
+  --status-landed: #6b7280;
+  --status-lost-signal: #dc2626;
+  --status-low-battery: #f59e0b;
+  --text-muted: #555;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "drone_id": "DRONE-004",
+    "drone_type": "Quadcopter",
+    "operator_id": "OP-123",
+    "latitude": 32.1000,
+    "longitude": 34.8000,
+    "altitude_m": 95,
+    "speed_kmh": 38,
+    "battery_percent": 18,
+    "timestamp": "2026-06-28T11:00:00Z",
+    "status": "active"
+  },
+  {
+    "drone_id": "",
+    "drone_type": "Quadcopter",
+    "operator_id": "OP-123",
+    "latitude": 200,
+    "longitude": 34.7818,
+    "altitude_m": -50,
+    "speed_kmh": 45,
+    "battery_percent": 150,
+    "timestamp": "invalid-date",
+    "status": "flying"
+  },
+  {
+    "drone_id": "DRONE-005",
+    "drone_type": "Fixed Wing",
+    "operator_id": "OP-456",
+    "latitude": 31.9000,
+    "longitude": 35.0000,
+    "altitude_m": 250,
+    "speed_kmh": 88,
+    "battery_percent": 64,
+    "timestamp": "2026-06-28T11:05:00Z",
+    "status": "landed"
+  }
+]

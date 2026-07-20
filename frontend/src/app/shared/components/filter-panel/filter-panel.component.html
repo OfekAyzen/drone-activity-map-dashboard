@@ -1,0 +1,41 @@
+<form class="filter-form" [formGroup]="form" (ngSubmit)="onApply()">
+  <div class="field">
+    <label for="drone_type">Drone type</label>
+    <input id="drone_type" type="text" formControlName="drone_type" placeholder="e.g. Quadcopter" />
+  </div>
+
+  <div class="field">
+    <label for="status">Status</label>
+    <select id="status" formControlName="status">
+      <option value="">Any</option>
+      <option value="active">Active</option>
+      <option value="landed">Landed</option>
+      <option value="lost_signal">Lost signal</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="operator_id">Operator ID</label>
+    <input id="operator_id" type="text" formControlName="operator_id" placeholder="e.g. OP-123" />
+  </div>
+
+  <div class="field">
+    <label for="min_battery">Min battery %</label>
+    <input id="min_battery" type="number" min="0" max="100" formControlName="min_battery" />
+  </div>
+
+  <div class="field">
+    <label for="from">From</label>
+    <input id="from" type="datetime-local" formControlName="from" />
+  </div>
+
+  <div class="field">
+    <label for="to">To</label>
+    <input id="to" type="datetime-local" formControlName="to" />
+  </div>
+
+  <div class="actions">
+    <button type="submit">Apply</button>
+    <button type="button" (click)="onReset()">Reset</button>
+  </div>
+</form>
