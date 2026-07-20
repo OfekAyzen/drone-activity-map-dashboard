@@ -152,6 +152,28 @@ Added after the initial submission, at your request, to cover the "Prefect/Celer
 
 **Non-obvious bug found and fixed during implementation**: Prefect's `.serve()` runs each flow in a subprocess and `cloudpickle`s the flow to hand it off. A task/flow body that references the module-level `SessionLocal` (a `sessionmaker` *instance* already bound to a live `Engine`) can't be pickled - cloudpickle must serialize it by value (it's not a class/function it can reference by name), which drags in the connection pool's unpicklable `threading.RLock`. Fixed by adding `create_session()` to `app/db/session.py`, which builds a fresh engine/session at call time instead of closing over the pre-bound global - confirmed via a series of isolated repro scripts (see chat) before touching the real code.
 
+**Status: done and verified.** Backend tests green (40, including 3 new ones in `tests/test_pipeline_service.py` for the sync/async/fallback branches). Verified live end-to-end via `docker compose -f docker-compose.yml -f docker-compose.prefect.yml up --build`: all 5 containers healthy, triggered `POST /api/pipeline/run` returned `status: started` immediately, polling `GET /api/pipeline/runs` showed it flip to `completed` a few seconds later (worker picked it up via Prefect), Prefect UI reachable on `:4201`. Also reconfirmed the plain `docker compose up` (no overlay) still has no `PREFECT_API_URL` on `api` - default path unaffected. Committed as "Phase 15: Add Prefect flow + worker for async pipeline" and pushed.
+
+## Phase 16 — Frontend polling for async pipeline runs
+
+**Status: not started** (next up). `DashboardStore.runPipeline()` (`frontend/src/app/core/state/dashboard.store.ts`) currently assumes the run is finished as soon as `pipelineService.run()` resolves - true for the sync path, not true when the Prefect overlay is active (response comes back `status: "started"`).
+
+Plan:
+- In `runPipeline()`'s success handler, check the returned run's `status`. If it's not `'started'`, keep today's behavior (`refresh$.next()` + `refreshRuns()` immediately).
+- If it *is* `'started'`, start a poll loop: `interval(1500).pipe(switchMap(() => this.pipelineService.listRuns()))`, find the entry matching the triggered run's `id`, stop (`take(1)` after a filter, or a manual subscription teardown) once its `status` is no longer `'started'`, then do the normal `refresh$.next()` + `refreshRuns()` and update `this.runs` from that same poll response so the UI badge flips live rather than waiting for the next full refresh.
+- Reuses the existing `GET /api/pipeline/runs` list endpoint (already small/cheap) - no new backend endpoint needed, matching the "no `GET /api/pipeline/runs/{id}`" decision from Phase 5.
+- The `pipeline-panel.component.css` already has a `.badge.started` style (amber) from Phase 10 - no CSS changes needed, it was anticipated.
+- Add tests in a new `dashboard.store.spec.ts` (didn't exist before - the store was previously only exercised indirectly via other component specs): mock `PipelineService.run()` to return `status: 'started'`, mock `listRuns()` to return `started` then `completed` on successive calls (use `vi.useFakeTimers()` + `vi.advanceTimersByTime(...)`, same pattern as `app.spec.ts`), assert the store's `runs`/`items` end up refreshed only after the poll resolves, and assert the sync case (`status` not `started`) does *not* poll at all.
+
+## Phase 17 — Verify both demo modes end-to-end
+
+**Status: partially done.** Backend/API-level verification of both modes already happened during Phase 15 (see above) via `curl`. Still needed once Phase 16 lands:
+- Playwright walkthrough (same `drive.js`-style script used earlier in the session) against the **Prefect overlay** stack specifically: click "Run Pipeline", confirm the UI shows a `started`/running badge state (not just an instant jump to `completed`), then confirm it resolves to `completed` and markers appear, all without a page reload.
+- Re-run the plain-mode Playwright walkthrough once more after the Phase 16 store changes, to confirm the sync path's UI still updates instantly (no spurious poll/delay introduced for the common case).
+- Update README's "Async pipeline execution (Prefect, bonus)" section if the UI behavior during polling needs describing (e.g. a "Running…" label).
+- Final cleanup: stop and remove the Prefect overlay containers/volumes used for testing (`docker compose -f docker-compose.yml -f docker-compose.prefect.yml down`), leave the plain stack's state up to the user.
+- Commit as "Phase 16: Frontend polling for async pipeline runs" and "Phase 17: Verify both demo modes end-to-end" (or squash into one, whichever the session doing the work prefers), then push - per your instruction to commit+push after each phase.
+
 ## Verification
 
 - Backend: `pytest` (all of Phase 6) green; manually hit `POST /api/pipeline/run` against both sample files and confirm `pipeline_run` counters match the known valid/invalid split; hit `/docs` and exercise each `/api/drones` filter combination and `/api/drones/{id}` 404 case.
