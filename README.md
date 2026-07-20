@@ -177,10 +177,10 @@ below and how each phase was scoped against the source skills in
 ## Testing
 
 ```bash
-# Backend (40 tests: validation rules, pipeline outcomes/idempotency, sync/async dispatch branching, API filters/pagination/404/422)
+# Backend (42 tests: validation rules, pipeline outcomes/idempotency, sync/async dispatch branching, API filters/pagination/404/422, stats aggregation)
 cd backend && ./.venv/Scripts/python.exe -m pytest -q
 
-# Frontend (16 tests: service HTTP param building, filter panel, Leaflet map rendering/reactivity)
+# Frontend (18 tests: service HTTP param building, filter panel, Leaflet map rendering/reactivity, pipeline-run polling)
 cd frontend && npm test
 ```
 

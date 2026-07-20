@@ -140,11 +140,14 @@ export class DashboardStore {
 
   selectDrone(droneId: string): void {
     this.selectedDroneId.set(droneId);
-    this.droneService.history(droneId).subscribe((page) => {
-      const sorted = [...page.items].sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-      );
-      this.pathPoints.set(sorted);
+    this.droneService.history(droneId).subscribe({
+      next: (page) => {
+        const sorted = [...page.items].sort(
+          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
+        this.pathPoints.set(sorted);
+      },
+      error: (err: Error) => this.error.set(err.message),
     });
   }
 
