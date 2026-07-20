@@ -9,7 +9,7 @@ import logging
 
 from prefect import flow, task
 
-from app.db.session import SessionLocal
+from app.db.session import create_session
 from app.models.pipeline_run import PipelineRun
 from app.pipeline.run import execute_pipeline_run
 
@@ -24,7 +24,9 @@ DEPLOYMENT_FULL_NAME = f"{FLOW_NAME}/{DEPLOYMENT_NAME}"
 def execute_ingest_task(pipeline_run_id: int) -> str:
     # A worker runs in its own process from the API's request - it must open
     # its own DB session rather than reuse one from the triggering request.
-    db = SessionLocal()
+    # create_session() (not the module-level SessionLocal) - see its docstring
+    # for why: SessionLocal is bound to a live Engine, which isn't cloudpickle-safe.
+    db = create_session()
     try:
         run = db.get(PipelineRun, pipeline_run_id)
         if run is None:

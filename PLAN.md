@@ -139,6 +139,19 @@ Per `project-documentation` + `git-workflow`:
 - Verify every printed command actually works from a clean checkout/clone.
 - Final `git status`/`git clean -ndx` check: no `node_modules`, `.db` files, or `.env` committed; conventional-commit history if not already followed incrementally.
 
+## Phase 15 — Async pipeline execution via Prefect (bonus)
+
+Added after the initial submission, at your request, to cover the "Prefect/Celery/background worker" bonus explicitly declined earlier (see the background-workers skill). Self-hosted (no Prefect Cloud account), opt-in via a second compose file rather than replacing the default synchronous path - see the chat discussion for why (core requirement shouldn't depend on the bonus's infrastructure working).
+
+- `app/pipeline/run.py` split into `start_pipeline_run()` (creates the row) + `execute_pipeline_run()` (does the work) + `run_pipeline()` (thin sync wrapper calling both) - one shared implementation for both execution paths, no duplicated pipeline logic.
+- `app/pipeline/prefect_flow.py`: `@flow ingest_flow(pipeline_run_id)` calling `@task execute_ingest_task`, which loads the existing run row and calls `execute_pipeline_run()`.
+- `app/pipeline/worker.py`: entry point that calls `ingest_flow.serve(name=DEPLOYMENT_NAME)` - registers the deployment *and* executes runs against it, no separate work-pool/`prefect worker start` step needed.
+- `app/services/pipeline.py`: `trigger_pipeline_run()` branches on whether `PREFECT_API_URL` is set in the environment (zero network calls, zero latency when it isn't - true for every test run and the default compose stack). When set, calls `run_deployment(..., timeout=0)` to dispatch and return immediately; falls back to synchronous execution on the *same* run row if dispatch itself raises.
+- `docker-compose.prefect.yml`: overlay file (not Compose profiles - profiles can't conditionally add an env var to an already-defined service) adding `PREFECT_API_URL` to `api`, plus new `prefect-server` and `worker` services. Demo: `docker compose -f docker-compose.yml -f docker-compose.prefect.yml up --build`. Prefect UI on `:4201` (`:4200` is already the frontend's port).
+- Frontend (`DashboardStore.runPipeline`) polls `GET /api/pipeline/runs` when a triggered run comes back `status: started`, until it resolves, then refreshes - see Phase 16.
+
+**Non-obvious bug found and fixed during implementation**: Prefect's `.serve()` runs each flow in a subprocess and `cloudpickle`s the flow to hand it off. A task/flow body that references the module-level `SessionLocal` (a `sessionmaker` *instance* already bound to a live `Engine`) can't be pickled - cloudpickle must serialize it by value (it's not a class/function it can reference by name), which drags in the connection pool's unpicklable `threading.RLock`. Fixed by adding `create_session()` to `app/db/session.py`, which builds a fresh engine/session at call time instead of closing over the pre-bound global - confirmed via a series of isolated repro scripts (see chat) before touching the real code.
+
 ## Verification
 
 - Backend: `pytest` (all of Phase 6) green; manually hit `POST /api/pipeline/run` against both sample files and confirm `pipeline_run` counters match the known valid/invalid split; hit `/docs` and exercise each `/api/drones` filter combination and `/api/drones/{id}` 404 case.

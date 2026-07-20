@@ -21,7 +21,9 @@ filters and pipeline-run visibility.
   date range), and a pipeline control panel with a run-history table.
 - Bonus features implemented: low-battery (<20%) and lost-signal markers are
   styled distinctly, the map defaults to showing only the latest position per
-  drone (toggleable), and clicking a drone draws its historical path.
+  drone (toggleable), clicking a drone draws its historical path, and the
+  pipeline can optionally run asynchronously via a self-hosted Prefect
+  flow + worker instead of inline in the request (see below).
 - Idempotent re-ingestion: re-running the pipeline against the same file does
   not duplicate rows already stored from that source.
 
@@ -39,6 +41,30 @@ Verified: `docker compose up --build` brings up `db` (Postgres, healthy),
 built and served via nginx, proxying `/api/` to `api`). Confirmed working
 end-to-end - pipeline trigger, drone filtering, and the map UI - through the
 containers, not just locally.
+
+## Async pipeline execution (Prefect, bonus)
+
+By default, `POST /api/pipeline/run` runs the pipeline inline and returns once
+it's done - fine at this dataset size, and the core requirement never depends
+on extra infrastructure being up. A second, opt-in mode dispatches the run to
+a self-hosted [Prefect](https://www.prefect.io/) flow instead, returning
+immediately with `status: "started"`; the frontend polls until it completes.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prefect.yml up --build
+```
+
+This adds two containers on top of the base stack: `prefect-server` (UI at
+http://localhost:4201) and `worker` (runs `ingest_flow.serve(...)`, which both
+registers the deployment and executes runs against it). No separate flag or
+env var to remember - the overlay file itself is what sets `PREFECT_API_URL`
+on `api`, so plain `docker compose up` (no overlay) is completely unaffected
+and behaves exactly as in the Quick Start above.
+
+Without the overlay, `api` never sees `PREFECT_API_URL`, so
+`trigger_pipeline_run()` (`app/services/pipeline.py`) takes the synchronous
+path with zero added latency - see the Design decisions below for why this
+wasn't made the default.
 
 ## Quick start (manual)
 
@@ -80,6 +106,7 @@ Open http://localhost:4200.
 | `DATABASE_URL` | `sqlite:///./drone.db` (backend-relative) | SQLAlchemy connection string. Docker Compose overrides this to `postgresql+psycopg://drone:drone@db:5432/drone`. |
 | `CORS_ORIGINS` | `http://localhost:4200` | Comma-separated list of allowed origins for the FastAPI CORS middleware. |
 | `PIPELINE_INPUT_DIR` | `data/incoming` (backend-relative) | Directory the pipeline reads source files from. |
+| `PREFECT_API_URL` | unset | Only set by `docker-compose.prefect.yml`. When present, pipeline runs dispatch to Prefect instead of running inline. |
 
 Copy `.env.example` to `.env` at the repo root and adjust as needed; the
 backend loads it via `python-dotenv`.
@@ -103,7 +130,7 @@ auto-generated OpenAPI UI) once the backend is running.
 backend/app/
   api/routes/    FastAPI routers - HTTP only, no business logic or SQL
   services/      query building, pipeline orchestration
-  pipeline/      load -> validate -> normalize -> store
+  pipeline/      load -> validate -> normalize -> store (+ prefect_flow.py/worker.py for the async path)
   models/        SQLAlchemy ORM (drone_record, pipeline_run)
   schemas/       Pydantic contracts (validation + API request/response)
   db/, core/     session/engine, settings, logging
@@ -142,7 +169,7 @@ below and how each phase was scoped against the source skills in
 ## Testing
 
 ```bash
-# Backend (37 tests: validation rules, pipeline outcomes/idempotency, API filters/pagination/404/422)
+# Backend (40 tests: validation rules, pipeline outcomes/idempotency, sync/async dispatch branching, API filters/pagination/404/422)
 cd backend && ./.venv/Scripts/python.exe -m pytest -q
 
 # Frontend (16 tests: service HTTP param building, filter panel, Leaflet map rendering/reactivity)
@@ -167,9 +194,12 @@ cd frontend && npm test
   "Run Pipeline" is clicked more than once against the same file.
 - **Pipeline trigger** reads one named file per run (`POST` body
   `{"source": "..."}`, defaulting to `sample_drones.json`) rather than
-  sweeping a whole folder, and runs synchronously - the sample datasets are
-  small enough that a background worker (Celery/Prefect) would add
-  complexity without a corresponding benefit here.
+  sweeping a whole folder.
+- **Synchronous by default, Prefect as an opt-in overlay, not a replacement**:
+  the sample datasets are small enough that synchronous execution has no
+  downside, and the core pipeline requirement shouldn't depend on extra
+  infrastructure (a Prefect server + worker) being healthy. See "Async
+  pipeline execution" above.
 - **Map fetch strategy**: filters alone drive refetching; there's no
   pan-to-refetch (bbox-on-`moveend`) behavior, since the spec only asks for
   the listed dropdown/date filters.
@@ -183,6 +213,7 @@ cd frontend && npm test
 .
 ├── PLAN.md                  Full implementation plan (phases, decisions, assumptions)
 ├── docker-compose.yml
+├── docker-compose.prefect.yml   Async pipeline overlay (prefect-server + worker)
 ├── .env.example
 ├── backend/
 │   ├── app/                 FastAPI app (see Architecture above)

@@ -1,0 +1,44 @@
+# Async pipeline execution overlay (bonus feature).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prefect.yml up --build
+#
+# Adds a self-hosted Prefect server + worker, and points `api` at the server.
+# Without this file, `docker compose up` runs exactly as before: no Prefect
+# containers, `api` has no PREFECT_API_URL, and the pipeline runs inline
+# (see app/services/pipeline.py:trigger_pipeline_run).
+
+services:
+  api:
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+
+  prefect-server:
+    image: prefecthq/prefect:3-python3.12
+    command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+    volumes:
+      - prefect_data:/root/.prefect
+    ports:
+      - "4201:4200"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build: ./backend
+    image: drone-dashboard-api
+    command: ["python", "-m", "app.pipeline.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://drone:drone@db:5432/drone
+      PIPELINE_INPUT_DIR: data/incoming
+      PREFECT_API_URL: http://prefect-server:4200/api
+    depends_on:
+      db:
+        condition: service_healthy
+      prefect-server:
+        condition: service_healthy
+
+volumes:
+  prefect_data:
