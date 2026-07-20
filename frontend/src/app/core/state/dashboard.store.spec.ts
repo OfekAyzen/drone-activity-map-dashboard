@@ -70,6 +70,9 @@ describe('DashboardStore', () => {
     const triggerReq = httpMock.expectOne((r) => r.url === '/api/pipeline/run');
     triggerReq.flush(makeRun({ id: 42, status: 'started' }));
 
+    // the triggered run is shown optimistically as "started" right away, before any poll tick
+    expect(store.runs()).toEqual([makeRun({ id: 42, status: 'started' })]);
+
     // no poll request until the first interval tick
     httpMock.expectNone((r) => r.url === '/api/pipeline/runs');
 
@@ -78,8 +81,8 @@ describe('DashboardStore', () => {
       .expectOne((r) => r.url === '/api/pipeline/runs')
       .flush([makeRun({ id: 42, status: 'started' })]);
 
-    // still started: store state untouched, no drones refetch triggered
-    expect(store.runs()).toEqual([]);
+    // still started: optimistic entry untouched, no drones refetch triggered
+    expect(store.runs()).toEqual([makeRun({ id: 42, status: 'started' })]);
 
     vi.advanceTimersByTime(1500);
     httpMock

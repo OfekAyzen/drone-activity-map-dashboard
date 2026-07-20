@@ -110,6 +110,7 @@ export class DashboardStore {
       next: (run) => {
         this.triggering.set(false);
         if (run.status === 'started') {
+          this.runs.update((current) => [run, ...current.filter((r) => r.id !== run.id)]);
           this.pollRun(run.id);
         } else {
           this.refresh$.next();

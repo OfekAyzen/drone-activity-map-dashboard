@@ -167,12 +167,14 @@ Added after the initial submission, at your request, to cover the "Prefect/Celer
 
 ## Phase 17 — Verify both demo modes end-to-end
 
-**Status: partially done.** Backend/API-level verification of both modes already happened during Phase 15 (see above) via `curl`. Still needed once Phase 16 lands:
-- Playwright walkthrough (same `drive.js`-style script used earlier in the session) against the **Prefect overlay** stack specifically: click "Run Pipeline", confirm the UI shows a `started`/running badge state (not just an instant jump to `completed`), then confirm it resolves to `completed` and markers appear, all without a page reload.
-- Re-run the plain-mode Playwright walkthrough once more after the Phase 16 store changes, to confirm the sync path's UI still updates instantly (no spurious poll/delay introduced for the common case).
-- Update README's "Async pipeline execution (Prefect, bonus)" section if the UI behavior during polling needs describing (e.g. a "Running…" label).
-- Final cleanup: stop and remove the Prefect overlay containers/volumes used for testing (`docker compose -f docker-compose.yml -f docker-compose.prefect.yml down`), leave the plain stack's state up to the user.
-- Commit as "Phase 16: Frontend polling for async pipeline runs" and "Phase 17: Verify both demo modes end-to-end" (or squash into one, whichever the session doing the work prefers), then push - per your instruction to commit+push after each phase.
+**Status: done.**
+
+- **Bug found and fixed while writing the Prefect-overlay Playwright walkthrough**: Phase 16's `runPipeline()` only wrote to `this.runs` once the poll saw a non-`started` status - so the runs table never actually showed the `started` badge, it just jumped straight to `completed` once the poll resolved (same end result as the sync path, defeating the point of showing async progress). Fixed by having the success handler on `pipelineService.run()` immediately upsert the returned `started` run into `this.runs` (dedup by `id`) before `pollRun()` starts, so the amber "started" badge appears the instant the trigger POST resolves. Updated `dashboard.store.spec.ts` to assert this optimistic-insert state explicitly; `ng test --watch=false` still green (6 files / 18 tests).
+- Rebuilt the `web` image (`docker compose -f docker-compose.yml -f docker-compose.prefect.yml up --build -d`) so the container actually ran the Phase 16 code, then drove it with a Playwright script (chromium, headless): click "Run Pipeline" -> button shows "Running…" during the POST -> new row appears with `.badge.started` immediately -> `.badge.completed` appears ~9s later via the poll -> URL unchanged throughout (no reload) -> `.leaflet-interactive` marker paths present on the map. All assertions passed.
+- Took the overlay down (`docker compose -f docker-compose.yml -f docker-compose.prefect.yml down`), brought up the plain stack (`docker compose up --build -d`, same named Postgres volume), and re-ran a plain-mode walkthrough: click "Run Pipeline" -> `.badge.completed` appears in <100ms (no poll wait), button resets to "Run Pipeline", no navigation, markers present. Confirms Phase 16 added zero latency/regressions to the sync path.
+- Updated README's "Async pipeline execution (Prefect, bonus)" section with a paragraph describing the started-badge-then-completed UI behavior and that the sync path skips it entirely.
+- Final cleanup done: Prefect overlay containers stopped/removed; only the plain stack (`db`/`api`/`web`) is left running for you.
+- Commits: "Phase 16: Frontend polling for async pipeline runs" (`500eedf`, already pushed) + a Phase 17 commit for the optimistic-insert fix, README update, and this status - pushed per your standing instruction to commit+push after each phase.
 
 ## Verification
 

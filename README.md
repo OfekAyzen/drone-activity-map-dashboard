@@ -66,6 +66,14 @@ Without the overlay, `api` never sees `PREFECT_API_URL`, so
 path with zero added latency - see the Design decisions below for why this
 wasn't made the default.
 
+In the UI, clicking "Run Pipeline" adds a new row to the runs table with an
+amber "started" badge right away, then `DashboardStore` polls
+`GET /api/pipeline/runs` every 1.5s until that run's status changes, flipping
+the badge to "completed" (or "failed") and refreshing the map - no page
+reload. In the default synchronous mode this happens instantly since the run
+is already finished by the time the request resolves, so the badge goes
+straight to "completed"/"failed" with no polling.
+
 ## Quick start (manual)
 
 ### Backend
