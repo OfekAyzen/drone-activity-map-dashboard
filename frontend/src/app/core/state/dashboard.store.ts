@@ -1,6 +1,6 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
-import { Subject, debounceTime, switchMap } from 'rxjs';
+import { Subject, debounceTime, filter, interval, switchMap, take } from 'rxjs';
 
 import { DroneService } from '../services/drone.service';
 import { PipelineService } from '../services/pipeline.service';
@@ -107,16 +107,34 @@ export class DashboardStore {
   runPipeline(source?: string): void {
     this.triggering.set(true);
     this.pipelineService.run(source).subscribe({
-      next: () => {
+      next: (run) => {
         this.triggering.set(false);
-        this.refresh$.next();
-        this.refreshRuns();
+        if (run.status === 'started') {
+          this.pollRun(run.id);
+        } else {
+          this.refresh$.next();
+          this.refreshRuns();
+        }
       },
       error: (err: Error) => {
         this.triggering.set(false);
         this.error.set(err.message);
       },
     });
+  }
+
+  private pollRun(runId: number): void {
+    interval(1500)
+      .pipe(
+        switchMap(() => this.pipelineService.listRuns()),
+        filter((runs) => runs.some((run) => run.id === runId && run.status !== 'started')),
+        take(1),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((runs) => {
+        this.runs.set(runs);
+        this.refresh$.next();
+      });
   }
 
   selectDrone(droneId: string): void {

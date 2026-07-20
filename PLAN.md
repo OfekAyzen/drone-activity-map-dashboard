@@ -156,14 +156,14 @@ Added after the initial submission, at your request, to cover the "Prefect/Celer
 
 ## Phase 16 — Frontend polling for async pipeline runs
 
-**Status: not started** (next up). `DashboardStore.runPipeline()` (`frontend/src/app/core/state/dashboard.store.ts`) currently assumes the run is finished as soon as `pipelineService.run()` resolves - true for the sync path, not true when the Prefect overlay is active (response comes back `status: "started"`).
+**Status: done.** `DashboardStore.runPipeline()` (`frontend/src/app/core/state/dashboard.store.ts`) now branches on the triggered run's `status`:
 
-Plan:
-- In `runPipeline()`'s success handler, check the returned run's `status`. If it's not `'started'`, keep today's behavior (`refresh$.next()` + `refreshRuns()` immediately).
-- If it *is* `'started'`, start a poll loop: `interval(1500).pipe(switchMap(() => this.pipelineService.listRuns()))`, find the entry matching the triggered run's `id`, stop (`take(1)` after a filter, or a manual subscription teardown) once its `status` is no longer `'started'`, then do the normal `refresh$.next()` + `refreshRuns()` and update `this.runs` from that same poll response so the UI badge flips live rather than waiting for the next full refresh.
-- Reuses the existing `GET /api/pipeline/runs` list endpoint (already small/cheap) - no new backend endpoint needed, matching the "no `GET /api/pipeline/runs/{id}`" decision from Phase 5.
-- The `pipeline-panel.component.css` already has a `.badge.started` style (amber) from Phase 10 - no CSS changes needed, it was anticipated.
-- Add tests in a new `dashboard.store.spec.ts` (didn't exist before - the store was previously only exercised indirectly via other component specs): mock `PipelineService.run()` to return `status: 'started'`, mock `listRuns()` to return `started` then `completed` on successive calls (use `vi.useFakeTimers()` + `vi.advanceTimersByTime(...)`, same pattern as `app.spec.ts`), assert the store's `runs`/`items` end up refreshed only after the poll resolves, and assert the sync case (`status` not `started`) does *not* poll at all.
+- If it's not `'started'`, unchanged behavior: `refresh$.next()` + `refreshRuns()` immediately.
+- If it *is* `'started'`, a new private `pollRun(runId)` starts `interval(1500).pipe(switchMap(() => this.pipelineService.listRuns()), filter(...), take(1), takeUntilDestroyed(this.destroyRef))`; once the matching run's status is no longer `'started'`, the subscription sets `this.runs` directly from that poll response (skipping a redundant `refreshRuns()` call) and fires `refresh$.next()` so the drone markers refresh too.
+- Reuses the existing `GET /api/pipeline/runs` list endpoint - no new backend endpoint needed, matching the "no `GET /api/pipeline/runs/{id}`" decision from Phase 5.
+- `pipeline-panel.component.html`/`.css` already bind `[runs]`/`.badge.started` from Phase 10 and the dashboard component already passes `store.runs()`/`store.triggering()` through - no template changes needed.
+- Added `frontend/src/app/core/state/dashboard.store.spec.ts` (new file - the store was previously only exercised indirectly): `vi.useFakeTimers()` + `vi.advanceTimersByTime(...)` (same pattern as `app.spec.ts`), one test asserting the sync case refreshes immediately with no poll requests, one test asserting the `started` case polls twice (still-started, then completed) before refreshing exactly once and updating `runs` from the poll response.
+- `ng test --watch=false`: all 6 spec files / 18 tests green (2 new).
 
 ## Phase 17 — Verify both demo modes end-to-end
 
