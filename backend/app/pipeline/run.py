@@ -1,7 +1,7 @@
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -73,9 +73,7 @@ def execute_pipeline_run(db: Session, run: PipelineRun) -> PipelineRun:
                 sample,
             )
 
-        new_rows = _dedupe_against_existing(db, valid, source)
-        if new_rows:
-            db.add_all(new_rows)
+        _insert_new_records(db, valid, source)
 
         run.total_records = len(raw_records) + len(parse_errors)
         run.valid_records = len(valid)
@@ -111,43 +109,49 @@ def run_pipeline(db: Session, source: str | None = None) -> PipelineRun:
     return execute_pipeline_run(db, run)
 
 
-def _dedupe_against_existing(
-    db: Session, valid: list[RawDroneRecord], source: str
-) -> list[DroneRecord]:
-    """Normalize valid records into DroneRecord rows, skipping ones already ingested
-    from this exact source (idempotent re-ingest on UNIQUE(drone_id, timestamp, source)).
+def _insert_new_records(db: Session, valid: list[RawDroneRecord], source: str) -> None:
+    """Insert valid records as DroneRecord rows, letting the database itself skip ones
+    already ingested from this exact source (idempotent re-ingest on
+    UNIQUE(drone_id, timestamp, source)) via INSERT ... ON CONFLICT DO NOTHING.
+
+    This must be a single atomic upsert rather than "SELECT existing, filter in Python,
+    then INSERT": two pipeline runs for the same source can otherwise both see no
+    existing rows, both attempt to insert the same batch, and the second commit crashes
+    with IntegrityError instead of harmlessly no-op'ing.
 
     Timestamps are stored and compared as naive UTC: SQLite drops tzinfo on round-trip
     while Postgres keeps it, so naive-UTC-by-convention is what stays consistent across both.
     """
-    existing_keys = {
-        (drone_id, _to_naive_utc(timestamp))
-        for drone_id, timestamp in db.execute(
-            select(DroneRecord.drone_id, DroneRecord.timestamp).where(DroneRecord.source == source)
-        ).all()
-    }
-
-    rows: list[DroneRecord] = []
     seen_in_batch: set[tuple[str, datetime]] = set()
+    values: list[dict] = []
     for record in valid:
         timestamp_utc = _to_naive_utc(record.timestamp)
         key = (record.drone_id, timestamp_utc)
-        if key in existing_keys or key in seen_in_batch:
+        if key in seen_in_batch:
             continue
         seen_in_batch.add(key)
-        rows.append(
-            DroneRecord(
-                drone_id=record.drone_id,
-                drone_type=record.drone_type,
-                operator_id=record.operator_id,
-                latitude=record.latitude,
-                longitude=record.longitude,
-                altitude_m=record.altitude_m,
-                speed_kmh=record.speed_kmh,
-                battery_percent=record.battery_percent,
-                timestamp=timestamp_utc,
-                status=record.status,
-                source=source,
-            )
+        values.append(
+            {
+                "drone_id": record.drone_id,
+                "drone_type": record.drone_type,
+                "operator_id": record.operator_id,
+                "latitude": record.latitude,
+                "longitude": record.longitude,
+                "altitude_m": record.altitude_m,
+                "speed_kmh": record.speed_kmh,
+                "battery_percent": record.battery_percent,
+                "timestamp": timestamp_utc,
+                "status": record.status,
+                "source": source,
+            }
         )
-    return rows
+
+    if not values:
+        return
+
+    dialect = db.get_bind().dialect.name
+    insert = postgresql.insert if dialect == "postgresql" else sqlite.insert
+    stmt = insert(DroneRecord).values(values).on_conflict_do_nothing(
+        index_elements=["drone_id", "timestamp", "source"]
+    )
+    db.execute(stmt)

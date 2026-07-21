@@ -1,12 +1,14 @@
 import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.models.drone_record import DroneRecord
 from app.models.enums import PipelineRunStatus
 from app.models.pipeline_run import PipelineRun
 from app.pipeline.loaders import load_records
-from app.pipeline.run import run_pipeline
+from app.pipeline.run import _insert_new_records, run_pipeline
+from app.pipeline.validate import validate_records
 
 
 def test_valid_only_file_completes_with_no_invalid_records(db):
@@ -49,6 +51,35 @@ def test_rerunning_same_source_is_idempotent(db):
     assert first.valid_records == second.valid_records == 3
     rows = db.execute(select(DroneRecord)).scalars().all()
     assert len(rows) == 3  # no duplicates inserted on the second run
+
+
+def test_concurrent_pipeline_runs_do_not_crash_on_duplicate_insert(db):
+    """Two pipeline runs for the same source that both compute their insert batch
+    without seeing each other's writes (the reported race) must not crash the
+    second one with IntegrityError - the DB-level ON CONFLICT DO NOTHING must
+    absorb the duplicate."""
+    source = "sample_drones.json"
+    raw_records, _ = load_records(settings.pipeline_input_dir / source)
+    valid, _ = validate_records(raw_records)
+
+    Session = sessionmaker(bind=db.get_bind(), autoflush=False, expire_on_commit=False)
+
+    session_a = Session()
+    try:
+        _insert_new_records(session_a, valid, source)
+        session_a.commit()
+    finally:
+        session_a.close()
+
+    session_b = Session()
+    try:
+        _insert_new_records(session_b, valid, source)
+        session_b.commit()  # must not raise IntegrityError
+    finally:
+        session_b.close()
+
+    rows = db.execute(select(DroneRecord)).scalars().all()
+    assert len(rows) == 3  # no duplicates inserted, no crash
 
 
 def test_missing_source_file_marks_run_failed(db):

@@ -169,15 +169,17 @@ below and how each phase was scoped against the source skills in
    round-trip, and Postgres, which keeps it).
 4. **Store** - a `pipeline_run` row is created with `status="started"` and
    committed immediately, so a crash mid-run leaves a visibly stuck row
-   rather than silence. Valid rows are deduplicated against
-   `(drone_id, timestamp, source)` already in the database, then bulk
-   inserted. The run is then marked `completed` (with counters) or `failed`
-   (with the error message, on rollback).
+   rather than silence. Valid rows are inserted via an atomic
+   `INSERT ... ON CONFLICT (drone_id, timestamp, source) DO NOTHING` upsert,
+   so the database itself - not a Python check-then-insert - absorbs
+   duplicates, including ones from two pipeline runs for the same source
+   committing at nearly the same time. The run is then marked `completed`
+   (with counters) or `failed` (with the error message, on rollback).
 
 ## Testing
 
 ```bash
-# Backend (42 tests: validation rules, pipeline outcomes/idempotency, sync/async dispatch branching, API filters/pagination/404/422, stats aggregation)
+# Backend (53 tests: validation rules, pipeline outcomes/idempotency/concurrency, sync/async dispatch branching, API filters/pagination/404/422, stats aggregation, latest-per-drone querying)
 cd backend && ./.venv/Scripts/python.exe -m pytest -q
 
 # Frontend (18 tests: service HTTP param building, filter panel, Leaflet map rendering/reactivity, pipeline-run polling)
@@ -199,7 +201,12 @@ cd frontend && npm test
   features so it works identically on both.
 - **Idempotent re-ingest** (`UNIQUE(drone_id, timestamp, source)`, skip
   on conflict) isn't required by the spec but prevents duplicate rows if
-  "Run Pipeline" is clicked more than once against the same file.
+  "Run Pipeline" is clicked more than once against the same file. The
+  skip-on-conflict is done as a single DB-level `INSERT ... ON CONFLICT DO
+  NOTHING` (not a Python "check existing rows, then insert" step), so two
+  clients triggering a run for the same source at the same time can't race
+  each other into an `IntegrityError` - the loser of the race just no-ops
+  instead of crashing.
 - **Pipeline trigger** reads one named file per run (`POST` body
   `{"source": "..."}`, defaulting to `sample_drones.json`) rather than
   sweeping a whole folder.
