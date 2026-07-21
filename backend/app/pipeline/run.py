@@ -51,8 +51,18 @@ def execute_pipeline_run(db: Session, run: PipelineRun) -> PipelineRun:
     input_path = settings.pipeline_input_dir / source
 
     try:
-        raw_records = load_records(input_path)
+        raw_records, parse_errors = load_records(input_path)
         valid, invalid = validate_records(raw_records)
+
+        if parse_errors:
+            sample = parse_errors[:20]
+            log.warning(
+                "pipeline run %s: %d NDJSON line(s) failed to parse and were skipped "
+                "(showing up to 20): %s",
+                run.id,
+                len(parse_errors),
+                sample,
+            )
 
         if invalid:
             sample = invalid[:20]
@@ -67,9 +77,9 @@ def execute_pipeline_run(db: Session, run: PipelineRun) -> PipelineRun:
         if new_rows:
             db.add_all(new_rows)
 
-        run.total_records = len(raw_records)
+        run.total_records = len(raw_records) + len(parse_errors)
         run.valid_records = len(valid)
-        run.invalid_records = len(invalid)
+        run.invalid_records = len(invalid) + len(parse_errors)
         run.status = PipelineRunStatus.COMPLETED
         run.finished_at = datetime.now(UTC)
         db.commit()
