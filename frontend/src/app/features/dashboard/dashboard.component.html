@@ -24,7 +24,7 @@
 
     <div class="pagination">
       <button type="button" (click)="onPrevPage()" [disabled]="store.offset() === 0">Prev</button>
-      <span>{{ store.offset() + 1 }}-{{ store.offset() + store.visibleItems().length }} of {{ store.total() }}</span>
+      <span>{{ store.offset() + 1 }}-{{ store.offset() + store.items().length }} of {{ store.total() }}</span>
       <button type="button" (click)="onNextPage()" [disabled]="store.offset() + store.limit() >= store.total()">
         Next
       </button>
@@ -39,7 +39,7 @@
 
   <main class="map-area">
     <app-map
-      [points]="store.visibleItems()"
+      [points]="store.items()"
       [pathPoints]="store.pathPoints()"
       (droneSelected)="onDroneSelected($event)"
     />

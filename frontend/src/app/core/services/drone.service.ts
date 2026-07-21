@@ -10,6 +10,18 @@ export class DroneService {
   private readonly http = inject(HttpClient);
 
   list(filters: DroneFilters, limit: number, offset: number): Observable<Page<DroneRecord>> {
+    return this.http.get<Page<DroneRecord>>(`${API_BASE}/drones`, {
+      params: this.buildParams(filters, limit, offset),
+    });
+  }
+
+  listLatest(filters: DroneFilters, limit: number, offset: number): Observable<Page<DroneRecord>> {
+    return this.http.get<Page<DroneRecord>>(`${API_BASE}/drones/latest`, {
+      params: this.buildParams(filters, limit, offset),
+    });
+  }
+
+  private buildParams(filters: DroneFilters, limit: number, offset: number): HttpParams {
     let params = new HttpParams().set('limit', limit).set('offset', offset);
 
     if (filters.drone_type) params = params.set('drone_type', filters.drone_type);
@@ -19,7 +31,7 @@ export class DroneService {
     if (filters.from) params = params.set('from', filters.from);
     if (filters.to) params = params.set('to', filters.to);
 
-    return this.http.get<Page<DroneRecord>>(`${API_BASE}/drones`, { params });
+    return params;
   }
 
   get(id: number): Observable<DroneRecord> {

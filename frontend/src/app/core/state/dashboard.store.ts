@@ -1,21 +1,10 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { Subject, debounceTime, filter, interval, switchMap, take } from 'rxjs';
 
 import { DroneService } from '../services/drone.service';
 import { PipelineService } from '../services/pipeline.service';
 import { DroneFilters, DroneRecord, PipelineRun } from '../models';
-
-function dedupeLatestPerDrone(records: DroneRecord[]): DroneRecord[] {
-  const latestByDrone = new Map<string, DroneRecord>();
-  for (const record of records) {
-    const current = latestByDrone.get(record.drone_id);
-    if (!current || new Date(record.timestamp) > new Date(current.timestamp)) {
-      latestByDrone.set(record.drone_id, record);
-    }
-  }
-  return Array.from(latestByDrone.values());
-}
 
 @Injectable({ providedIn: 'root' })
 export class DashboardStore {
@@ -39,10 +28,6 @@ export class DashboardStore {
   readonly selectedDroneId = signal<string | null>(null);
   readonly pathPoints = signal<DroneRecord[]>([]);
 
-  readonly visibleItems = computed(() =>
-    this.latestOnly() ? dedupeLatestPerDrone(this.items()) : this.items(),
-  );
-
   private readonly refresh$ = new Subject<void>();
   private readonly pollTrigger$ = new Subject<number>();
 
@@ -53,7 +38,9 @@ export class DashboardStore {
         switchMap(() => {
           this.loading.set(true);
           this.error.set(null);
-          return this.droneService.list(this.filters(), this.limit(), this.offset());
+          return this.latestOnly()
+            ? this.droneService.listLatest(this.filters(), this.limit(), this.offset())
+            : this.droneService.list(this.filters(), this.limit(), this.offset());
         }),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -111,6 +98,8 @@ export class DashboardStore {
 
   toggleLatestOnly(): void {
     this.latestOnly.update((value) => !value);
+    this.offset.set(0);
+    this.refresh$.next();
   }
 
   refreshRuns(): void {

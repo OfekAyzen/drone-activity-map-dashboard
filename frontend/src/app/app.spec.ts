@@ -27,7 +27,7 @@ describe('App', () => {
     fixture.detectChanges();
     vi.advanceTimersByTime(200); // DashboardStore debounces its initial refresh by 200ms
 
-    httpMock.expectOne((r) => r.url === '/api/drones').flush({ items: [], total: 0, limit: 50, offset: 0 });
+    httpMock.expectOne((r) => r.url === '/api/drones/latest').flush({ items: [], total: 0, limit: 50, offset: 0 });
     httpMock.expectOne((r) => r.url === '/api/pipeline/runs').flush([]);
 
     expect(fixture.componentInstance).toBeTruthy();

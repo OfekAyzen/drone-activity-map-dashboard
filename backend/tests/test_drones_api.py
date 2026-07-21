@@ -96,6 +96,33 @@ def test_invalid_query_param_returns_422(client):
     assert resp.status_code == 422
 
 
+def test_flood_drone_dominates_raw_endpoint(client):
+    resp = client.post("/api/pipeline/run", json={"source": "sample_drones_flood.json"})
+    assert resp.status_code == 201
+
+    resp = client.get("/api/drones", params={"limit": 3})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 5
+    assert {item["drone_id"] for item in body["items"]} == {"DRONE-001"}
+
+
+def test_latest_endpoint_returns_every_distinct_drone_despite_flood(client):
+    resp = client.post("/api/pipeline/run", json={"source": "sample_drones_flood.json"})
+    assert resp.status_code == 201
+
+    resp = client.get("/api/drones/latest", params={"limit": 3})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    assert {item["drone_id"] for item in body["items"]} == {"DRONE-001", "DRONE-002", "DRONE-003"}
+
+
+def test_latest_endpoint_route_is_not_shadowed_by_id_route(client):
+    resp = client.get("/api/drones/latest")
+    assert resp.status_code == 200
+
+
 def test_stats_endpoint(client):
     _seed(client)
     resp = client.get("/api/stats")

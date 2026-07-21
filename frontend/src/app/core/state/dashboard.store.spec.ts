@@ -36,7 +36,7 @@ describe('DashboardStore', () => {
     httpMock = TestBed.inject(HttpTestingController);
 
     vi.advanceTimersByTime(200); // initial refresh$ debounce
-    httpMock.expectOne((r) => r.url === '/api/drones').flush(emptyPage);
+    httpMock.expectOne((r) => r.url === '/api/drones/latest').flush(emptyPage);
     httpMock.expectOne((r) => r.url === '/api/pipeline/runs').flush([]);
   });
 
@@ -55,7 +55,7 @@ describe('DashboardStore', () => {
     httpMock.expectOne((r) => r.url === '/api/pipeline/runs').flush([makeRun({ id: 7, status: 'completed' })]);
 
     vi.advanceTimersByTime(200); // refresh$ debounce for the drones refetch
-    httpMock.expectOne((r) => r.url === '/api/drones').flush(emptyPage);
+    httpMock.expectOne((r) => r.url === '/api/drones/latest').flush(emptyPage);
 
     expect(store.runs()).toEqual([makeRun({ id: 7, status: 'completed' })]);
 
@@ -93,7 +93,7 @@ describe('DashboardStore', () => {
     expect(store.runs()).toEqual([makeRun({ id: 42, status: 'completed' })]);
 
     vi.advanceTimersByTime(200); // refresh$ debounce
-    httpMock.expectOne((r) => r.url === '/api/drones').flush(emptyPage);
+    httpMock.expectOne((r) => r.url === '/api/drones/latest').flush(emptyPage);
 
     // polling has stopped
     vi.advanceTimersByTime(1500);
@@ -124,10 +124,36 @@ describe('DashboardStore', () => {
     expect(store.triggering()).toBe(false);
 
     vi.advanceTimersByTime(200); // refresh$ debounce
-    httpMock.expectOne((r) => r.url === '/api/drones').flush(emptyPage);
+    httpMock.expectOne((r) => r.url === '/api/drones/latest').flush(emptyPage);
 
     // run 1's abandoned poll never resumes
     vi.advanceTimersByTime(1500);
     httpMock.expectNone((r) => r.url === '/api/pipeline/runs');
+  });
+
+  it('toggleLatestOnly() refetches from the raw endpoint, then back from /latest', () => {
+    store.toggleLatestOnly();
+    expect(store.latestOnly()).toBe(false);
+
+    vi.advanceTimersByTime(200); // refresh$ debounce
+    httpMock.expectOne((r) => r.url === '/api/drones').flush(emptyPage);
+
+    store.toggleLatestOnly();
+    expect(store.latestOnly()).toBe(true);
+
+    vi.advanceTimersByTime(200);
+    httpMock.expectOne((r) => r.url === '/api/drones/latest').flush(emptyPage);
+  });
+
+  it('toggleLatestOnly() resets offset to 0 before refetching', () => {
+    store.setPage(50);
+    vi.advanceTimersByTime(200);
+    httpMock.expectOne((r) => r.url === '/api/drones/latest' && r.params.get('offset') === '50').flush(emptyPage);
+
+    store.toggleLatestOnly();
+    expect(store.offset()).toBe(0);
+
+    vi.advanceTimersByTime(200);
+    httpMock.expectOne((r) => r.url === '/api/drones' && r.params.get('offset') === '0').flush(emptyPage);
   });
 });

@@ -59,6 +59,43 @@ describe('DroneService', () => {
     req.flush({ items: [], total: 0, limit: 20, offset: 10 } satisfies Page<DroneRecord>);
   });
 
+  it('listLatest() sends only limit/offset when no filters are set', () => {
+    service.listLatest({}, 50, 0).subscribe();
+    const req = httpMock.expectOne(
+      (r) => r.url === '/api/drones/latest' && r.params.get('limit') === '50' && r.params.get('offset') === '0',
+    );
+    expect(req.request.params.keys().length).toBe(2);
+    req.flush({ items: [], total: 0, limit: 50, offset: 0 } satisfies Page<DroneRecord>);
+  });
+
+  it('listLatest() forwards each populated filter as its own query param', () => {
+    service
+      .listLatest(
+        {
+          drone_type: 'Quadcopter',
+          status: 'active',
+          operator_id: 'OP-123',
+          min_battery: 50,
+          from: '2026-06-01T00:00:00Z',
+          to: '2026-06-28T00:00:00Z',
+        },
+        20,
+        10,
+      )
+      .subscribe();
+
+    const req = httpMock.expectOne((r) => r.url === '/api/drones/latest');
+    expect(req.request.params.get('drone_type')).toBe('Quadcopter');
+    expect(req.request.params.get('status')).toBe('active');
+    expect(req.request.params.get('operator_id')).toBe('OP-123');
+    expect(req.request.params.get('min_battery')).toBe('50');
+    expect(req.request.params.get('from')).toBe('2026-06-01T00:00:00Z');
+    expect(req.request.params.get('to')).toBe('2026-06-28T00:00:00Z');
+    expect(req.request.params.get('limit')).toBe('20');
+    expect(req.request.params.get('offset')).toBe('10');
+    req.flush({ items: [], total: 0, limit: 20, offset: 10 } satisfies Page<DroneRecord>);
+  });
+
   it('gets a single drone record by id', () => {
     service.get(7).subscribe();
     const req = httpMock.expectOne('/api/drones/7');
