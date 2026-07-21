@@ -99,4 +99,35 @@ describe('DashboardStore', () => {
     vi.advanceTimersByTime(1500);
     httpMock.expectNone((r) => r.url === '/api/pipeline/runs');
   });
+
+  it('cancels the previous poll loop when a run is triggered again before the first resolves', () => {
+    store.runPipeline();
+    httpMock.expectOne((r) => r.url === '/api/pipeline/run').flush(makeRun({ id: 1, status: 'started' }));
+
+    // second click lands before run 1's poll has even ticked once
+    store.runPipeline();
+    httpMock.expectOne((r) => r.url === '/api/pipeline/run').flush(makeRun({ id: 2, status: 'started' }));
+
+    // only run 2's poll loop should be alive: a single tick produces a single request
+    vi.advanceTimersByTime(1500);
+    httpMock
+      .expectOne((r) => r.url === '/api/pipeline/runs')
+      .flush([makeRun({ id: 2, status: 'started' }), makeRun({ id: 1, status: 'started' })]);
+    httpMock.expectNone((r) => r.url === '/api/pipeline/runs');
+
+    vi.advanceTimersByTime(1500);
+    httpMock
+      .expectOne((r) => r.url === '/api/pipeline/runs')
+      .flush([makeRun({ id: 2, status: 'completed' }), makeRun({ id: 1, status: 'started' })]);
+    httpMock.expectNone((r) => r.url === '/api/pipeline/runs');
+
+    expect(store.triggering()).toBe(false);
+
+    vi.advanceTimersByTime(200); // refresh$ debounce
+    httpMock.expectOne((r) => r.url === '/api/drones').flush(emptyPage);
+
+    // run 1's abandoned poll never resumes
+    vi.advanceTimersByTime(1500);
+    httpMock.expectNone((r) => r.url === '/api/pipeline/runs');
+  });
 });

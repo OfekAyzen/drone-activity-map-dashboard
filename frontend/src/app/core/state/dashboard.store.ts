@@ -44,6 +44,7 @@ export class DashboardStore {
   );
 
   private readonly refresh$ = new Subject<void>();
+  private readonly pollTrigger$ = new Subject<number>();
 
   constructor() {
     this.refresh$
@@ -66,6 +67,25 @@ export class DashboardStore {
           this.error.set(err.message);
           this.loading.set(false);
         },
+      });
+
+    // switchMap cancels the previous run's poll loop the moment a new run is
+    // triggered, so a burst of clicks leaves at most one interval(1500) alive.
+    this.pollTrigger$
+      .pipe(
+        switchMap((runId) =>
+          interval(1500).pipe(
+            switchMap(() => this.pipelineService.listRuns()),
+            filter((runs) => runs.some((run) => run.id === runId && run.status !== 'started')),
+            take(1),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((runs) => {
+        this.runs.set(runs);
+        this.triggering.set(false);
+        this.refresh$.next();
       });
 
     this.refresh$.next();
@@ -108,11 +128,11 @@ export class DashboardStore {
     this.triggering.set(true);
     this.pipelineService.run(source).subscribe({
       next: (run) => {
-        this.triggering.set(false);
         if (run.status === 'started') {
           this.runs.update((current) => [run, ...current.filter((r) => r.id !== run.id)]);
-          this.pollRun(run.id);
+          this.pollTrigger$.next(run.id);
         } else {
+          this.triggering.set(false);
           this.refresh$.next();
           this.refreshRuns();
         }
@@ -122,20 +142,6 @@ export class DashboardStore {
         this.error.set(err.message);
       },
     });
-  }
-
-  private pollRun(runId: number): void {
-    interval(1500)
-      .pipe(
-        switchMap(() => this.pipelineService.listRuns()),
-        filter((runs) => runs.some((run) => run.id === runId && run.status !== 'started')),
-        take(1),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((runs) => {
-        this.runs.set(runs);
-        this.refresh$.next();
-      });
   }
 
   selectDrone(droneId: string): void {
