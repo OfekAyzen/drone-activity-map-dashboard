@@ -35,6 +35,7 @@ export class MapComponent implements AfterViewInit, OnChanges, OnDestroy {
   private map?: L.Map;
   private markersLayer?: L.LayerGroup;
   private pathLayer?: L.Polyline;
+  private resizeObserver?: ResizeObserver;
 
   ngAfterViewInit(): void {
     this.map = L.map(this.mapContainerRef.nativeElement).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -47,8 +48,8 @@ export class MapComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.redrawMarkers();
     this.redrawPath();
 
-    // Layout can settle after the grid/flex shell finishes sizing.
-    setTimeout(() => this.map?.invalidateSize(), 0);
+    this.resizeObserver = new ResizeObserver(() => this.map?.invalidateSize());
+    this.resizeObserver.observe(this.mapContainerRef.nativeElement);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -58,6 +59,7 @@ export class MapComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
     this.map?.remove();
   }
 
