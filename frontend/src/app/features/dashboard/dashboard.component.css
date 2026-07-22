@@ -41,6 +41,25 @@
   gap: 1rem;
   background: var(--console-panel);
   border-right: 1px solid var(--console-line);
+  scrollbar-width: thin;
+  scrollbar-color: var(--console-line) var(--console-panel);
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: var(--console-panel);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: var(--console-line);
+  border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: var(--console-accent);
 }
 
 .map-area {
