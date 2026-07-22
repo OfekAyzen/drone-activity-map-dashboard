@@ -3,10 +3,29 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PipelineRun } from '../models';
+import { DroneRecord, PipelineRun } from '../models';
 import { DashboardStore } from './dashboard.store';
 
 const emptyPage = { items: [], total: 0, limit: 50, offset: 0 };
+
+function makeDrone(overrides: Partial<DroneRecord> = {}): DroneRecord {
+  return {
+    id: 1,
+    drone_id: 'DRONE-A',
+    drone_type: 'Quadcopter',
+    operator_id: 'OP-1',
+    latitude: 32.08,
+    longitude: 34.78,
+    altitude_m: 100,
+    speed_kmh: 40,
+    battery_percent: 80,
+    timestamp: '2026-07-20T08:00:00Z',
+    status: 'active',
+    source: 'sample.json',
+    ingested_at: '2026-07-20T08:00:01Z',
+    ...overrides,
+  };
+}
 
 function makeRun(overrides: Partial<PipelineRun> = {}): PipelineRun {
   return {
@@ -155,5 +174,60 @@ describe('DashboardStore', () => {
 
     vi.advanceTimersByTime(200);
     httpMock.expectOne((r) => r.url === '/api/drones' && r.params.get('offset') === '0').flush(emptyPage);
+  });
+
+  it('selectDrone() fetches that drone history and sorts pathPoints by timestamp ascending', () => {
+    store.selectDrone('DRONE-A');
+    expect(store.selectedDroneId()).toBe('DRONE-A');
+
+    const req = httpMock.expectOne((r) => r.url === '/api/drones' && r.params.get('drone_id') === 'DRONE-A');
+    req.flush({
+      items: [
+        makeDrone({ drone_id: 'DRONE-A', timestamp: '2026-07-20T08:10:00Z', latitude: 32.1 }),
+        makeDrone({ drone_id: 'DRONE-A', timestamp: '2026-07-20T08:00:00Z', latitude: 32.0 }),
+      ],
+      total: 2,
+      limit: 500,
+      offset: 0,
+    });
+
+    expect(store.pathPoints().map((p) => p.timestamp)).toEqual([
+      '2026-07-20T08:00:00Z',
+      '2026-07-20T08:10:00Z',
+    ]);
+  });
+
+  it('selecting a new drone cancels a still-pending history request for the previous one', () => {
+    store.selectDrone('DRONE-A');
+    store.selectDrone('DRONE-B');
+    expect(store.selectedDroneId()).toBe('DRONE-B');
+
+    // both requests were fired (no request-side dedup), but switchMap unsubscribes DRONE-A's
+    // request the instant DRONE-B is selected, so Angular's HTTP client cancels it outright -
+    // it can never resolve into pathPoints even if the server had already sent a response.
+    const requests = httpMock.match((r) => r.url === '/api/drones');
+    expect(requests).toHaveLength(2);
+    const reqA = requests.find((r) => r.request.params.get('drone_id') === 'DRONE-A')!;
+    const reqB = requests.find((r) => r.request.params.get('drone_id') === 'DRONE-B')!;
+    expect(reqA.cancelled).toBe(true);
+
+    reqB.flush({
+      items: [makeDrone({ drone_id: 'DRONE-B', timestamp: '2026-07-20T09:00:00Z' })],
+      total: 1,
+      limit: 500,
+      offset: 0,
+    });
+
+    expect(store.pathPoints().map((p) => p.drone_id)).toEqual(['DRONE-B']);
+  });
+
+  it('clearSelection() cancels a still-pending history request and resets pathPoints', () => {
+    store.selectDrone('DRONE-A');
+    const req = httpMock.expectOne((r) => r.url === '/api/drones' && r.params.get('drone_id') === 'DRONE-A');
+
+    store.clearSelection();
+    expect(store.selectedDroneId()).toBeNull();
+    expect(store.pathPoints()).toEqual([]);
+    expect(req.cancelled).toBe(true);
   });
 });

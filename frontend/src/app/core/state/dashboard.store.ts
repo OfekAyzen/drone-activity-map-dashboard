@@ -1,6 +1,6 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef, Injectable, inject, signal } from '@angular/core';
-import { Subject, debounceTime, filter, interval, switchMap, take } from 'rxjs';
+import { Subject, debounceTime, filter, interval, map, of, switchMap, take } from 'rxjs';
 
 import { DroneService } from '../services/drone.service';
 import { PipelineService } from '../services/pipeline.service';
@@ -30,6 +30,7 @@ export class DashboardStore {
 
   private readonly refresh$ = new Subject<void>();
   private readonly pollTrigger$ = new Subject<number>();
+  private readonly selectDrone$ = new Subject<string | null>();
 
   constructor() {
     this.refresh$
@@ -73,6 +74,28 @@ export class DashboardStore {
         this.runs.set(runs);
         this.triggering.set(false);
         this.refresh$.next();
+      });
+
+    // switchMap cancels a still-pending history request the moment a new
+    // drone is selected (or the selection is cleared), so a slow stale
+    // response can never overwrite pathPoints for the currently selected drone.
+    this.selectDrone$
+      .pipe(
+        switchMap((droneId) =>
+          droneId === null
+            ? of([] as DroneRecord[])
+            : this.droneService.history(droneId).pipe(map((page) => page.items)),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (items) => {
+          const sorted = [...items].sort(
+            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+          );
+          this.pathPoints.set(sorted);
+        },
+        error: (err: Error) => this.error.set(err.message),
       });
 
     this.refresh$.next();
@@ -135,19 +158,11 @@ export class DashboardStore {
 
   selectDrone(droneId: string): void {
     this.selectedDroneId.set(droneId);
-    this.droneService.history(droneId).subscribe({
-      next: (page) => {
-        const sorted = [...page.items].sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-        );
-        this.pathPoints.set(sorted);
-      },
-      error: (err: Error) => this.error.set(err.message),
-    });
+    this.selectDrone$.next(droneId);
   }
 
   clearSelection(): void {
     this.selectedDroneId.set(null);
-    this.pathPoints.set([]);
+    this.selectDrone$.next(null);
   }
 }

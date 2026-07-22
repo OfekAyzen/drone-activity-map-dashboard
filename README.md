@@ -189,7 +189,7 @@ below and how each phase was scoped against the source skills in
 # Backend (53 tests: validation rules, pipeline outcomes/idempotency/concurrency, sync/async dispatch branching, API filters/pagination/404/422, stats aggregation, latest-per-drone querying)
 cd backend && ./.venv/Scripts/python.exe -m pytest -q
 
-# Frontend (34 tests: service HTTP param building, filter panel/filter chip, Leaflet map rendering/reactivity, pipeline-run polling)
+# Frontend (37 tests: service HTTP param building, filter panel/filter chip, Leaflet map rendering/reactivity, pipeline-run polling, drone path-history selection)
 cd frontend && npm test
 ```
 
@@ -232,6 +232,11 @@ cd frontend && npm test
   (`frontend/src/index.html`) - the only new external asset added for the
   console visual identity. A font load, not a runtime dependency; no bundler
   plugin or npm package was added for it.
+- **Drone path-history selection is `switchMap`-guarded**: selecting a new
+  drone (or clearing the selection) cancels any still-in-flight history
+  request from a previous click, so a slower stale response can never
+  overwrite the currently-selected drone's path - the same pattern already
+  used for filter refetches and pipeline-run polling in `dashboard.store.ts`.
 
 ## Project structure
 
