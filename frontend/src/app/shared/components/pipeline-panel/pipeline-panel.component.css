@@ -12,43 +12,67 @@
 
 .header-row h3 {
   margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--console-text-dim);
 }
 
 .header-row button {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  background: #2563eb;
-  color: white;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--console-accent);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--console-accent);
+  font-family: var(--font-display);
   font-weight: 600;
   cursor: pointer;
 }
 
+.header-row button:hover:not(:disabled) {
+  background: var(--console-accent);
+  color: var(--console-ink);
+}
+
 .header-row button:disabled {
-  background: #93b6f0;
+  border-color: var(--console-line);
+  color: var(--console-text-dim);
   cursor: not-allowed;
 }
 
 .runs-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--console-text);
+}
+
+.runs-table th {
+  color: var(--console-text-dim);
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
 }
 
 .runs-table th,
 .runs-table td {
   padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--console-line);
   text-align: left;
 }
 
 .badge {
   display: inline-block;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: white;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--console-ink);
 }
 
 .badge.started {
@@ -60,10 +84,11 @@
 }
 
 .badge.failed {
-  background: #991b1b;
+  background: var(--status-lost-signal, #dc2626);
+  color: white;
 }
 
 .empty-state {
-  color: #6b7280;
+  color: var(--console-text-dim);
   font-style: italic;
 }

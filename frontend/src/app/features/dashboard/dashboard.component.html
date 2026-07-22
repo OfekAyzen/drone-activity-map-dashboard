@@ -3,9 +3,11 @@
     <h1>Drone Activity Map Dashboard</h1>
   </header>
 
-  <aside class="sidebar">
+  <div class="filters-toolbar">
     <app-filter-panel (apply)="onApplyFilters($event)" (reset)="onResetFilters()" />
+  </div>
 
+  <aside class="sidebar">
     <div class="view-toggle">
       <label>
         <input type="checkbox" [checked]="store.latestOnly()" (change)="store.toggleLatestOnly()" />

@@ -18,3 +18,6 @@
 - Write or update tests with each feature.
 - Don't add libraries without noting why.
 - Keep functions small and single-purpose.
+- Before each commit make sure to update and add to the phases in the PLAN.md.
+- Always make sure to update the phases in the PLAN.md before making any changes to the code.
+- After each commit, update the README.md with the changes that were made.

@@ -17,9 +17,8 @@ import { PipelinePanelComponent } from '../../shared/components/pipeline-panel/p
 export class DashboardComponent {
   readonly store = inject(DashboardStore);
 
-  onApplyFilters(filters: DroneFilters): void {
-    this.store.filters.set({});
-    this.store.patchFilters(filters);
+  onApplyFilters(patch: DroneFilters): void {
+    this.store.patchFilters(patch);
   }
 
   onResetFilters(): void {

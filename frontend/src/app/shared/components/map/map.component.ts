@@ -92,7 +92,7 @@ export class MapComponent implements AfterViewInit, OnChanges, OnDestroy {
     if (this.pathPoints.length < 2) return;
 
     const latLngs: L.LatLngTuple[] = this.pathPoints.map((p) => [p.latitude, p.longitude]);
-    this.pathLayer = L.polyline(latLngs, { color: '#2563eb', weight: 3, opacity: 0.7 }).addTo(this.map);
+    this.pathLayer = L.polyline(latLngs, { color: '#4fd1c5', weight: 3, opacity: 0.7 }).addTo(this.map);
   }
 
   private popupHtml(point: DroneRecord): string {

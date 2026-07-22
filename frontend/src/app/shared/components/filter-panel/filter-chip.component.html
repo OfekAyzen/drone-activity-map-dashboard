@@ -1,0 +1,16 @@
+<div class="filter-chip">
+  <button
+    type="button"
+    class="chip-trigger"
+    [class.active]="active"
+    [attr.aria-expanded]="open()"
+    (click)="toggle()"
+  >
+    {{ label }}
+    <span class="caret" aria-hidden="true">▾</span>
+  </button>
+
+  <div class="popover" *ngIf="open()" role="dialog" [attr.aria-label]="label">
+    <ng-content></ng-content>
+  </div>
+</div>

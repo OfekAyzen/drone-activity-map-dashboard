@@ -1,41 +1,86 @@
-<form class="filter-form" [formGroup]="form" (ngSubmit)="onApply()">
-  <div class="field">
-    <label for="drone_type">Drone type</label>
-    <input id="drone_type" type="text" formControlName="drone_type" placeholder="e.g. Quadcopter" />
-  </div>
+<div class="filter-bar">
+  <app-filter-chip #typeChip [label]="droneTypeLabel()" [active]="!!droneType()">
+    <label class="popover-label" for="drone_type">Drone type</label>
+    <input
+      id="drone_type"
+      class="chip-input"
+      type="text"
+      placeholder="e.g. Quadcopter"
+      [value]="droneType()"
+      (input)="onDroneTypeInput($event)"
+      (blur)="applyDroneType()"
+      (keydown.enter)="applyDroneType(); typeChip.close()"
+    />
+  </app-filter-chip>
 
-  <div class="field">
-    <label for="status">Status</label>
-    <select id="status" formControlName="status">
-      <option value="">Any</option>
-      <option value="active">Active</option>
-      <option value="landed">Landed</option>
-      <option value="lost_signal">Lost signal</option>
-    </select>
-  </div>
+  <app-filter-chip #statusChip [label]="statusLabel()" [active]="!!status()">
+    <div class="option-list" role="radiogroup" aria-label="Status">
+      <button
+        type="button"
+        *ngFor="let option of statusOptions"
+        class="option"
+        role="radio"
+        [attr.aria-checked]="option.value === status()"
+        [class.selected]="option.value === status()"
+        (click)="selectStatus(option.value, statusChip)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+  </app-filter-chip>
 
-  <div class="field">
-    <label for="operator_id">Operator ID</label>
-    <input id="operator_id" type="text" formControlName="operator_id" placeholder="e.g. OP-123" />
-  </div>
+  <app-filter-chip #operatorChip [label]="operatorIdLabel()" [active]="!!operatorId()">
+    <label class="popover-label" for="operator_id">Operator ID</label>
+    <input
+      id="operator_id"
+      class="chip-input"
+      type="text"
+      placeholder="e.g. OP-123"
+      [value]="operatorId()"
+      (input)="onOperatorIdInput($event)"
+      (blur)="applyOperatorId()"
+      (keydown.enter)="applyOperatorId(); operatorChip.close()"
+    />
+  </app-filter-chip>
 
-  <div class="field">
-    <label for="min_battery">Min battery %</label>
-    <input id="min_battery" type="number" min="0" max="100" formControlName="min_battery" />
-  </div>
+  <app-filter-chip #batteryChip [label]="minBatteryLabel()" [active]="minBattery() != null">
+    <label class="popover-label" for="min_battery">Min battery %</label>
+    <input
+      id="min_battery"
+      class="chip-input"
+      type="number"
+      min="0"
+      max="100"
+      [value]="minBattery()"
+      (input)="onMinBatteryInput($event)"
+      (blur)="applyMinBattery()"
+      (keydown.enter)="applyMinBattery(); batteryChip.close()"
+    />
+  </app-filter-chip>
 
-  <div class="field">
-    <label for="from">From</label>
-    <input id="from" type="datetime-local" formControlName="from" />
-  </div>
+  <app-filter-chip
+    #dateChip
+    [label]="dateRangeLabel()"
+    [active]="dateRangeActive()"
+    (opened)="resetDateDraft()"
+  >
+    <label class="popover-label" for="from">From</label>
+    <input
+      id="from"
+      class="chip-input"
+      type="datetime-local"
+      [value]="draftFrom()"
+      (input)="onDraftFromInput($event)"
+    />
 
-  <div class="field">
-    <label for="to">To</label>
-    <input id="to" type="datetime-local" formControlName="to" />
-  </div>
+    <label class="popover-label" for="to">To</label>
+    <input id="to" class="chip-input" type="datetime-local" [value]="draftTo()" (input)="onDraftToInput($event)" />
 
-  <div class="actions">
-    <button type="submit">Apply</button>
-    <button type="button" (click)="onReset()">Reset</button>
-  </div>
-</form>
+    <div class="popover-actions">
+      <button type="button" class="apply" (click)="applyDateRange(dateChip)">Apply</button>
+      <button type="button" class="clear" (click)="clearDateRange(dateChip)">Clear</button>
+    </div>
+  </app-filter-chip>
+
+  <button type="button" class="reset-all" (click)="onReset()">Reset</button>
+</div>
