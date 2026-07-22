@@ -17,8 +17,15 @@ filters and pipeline-run visibility.
   `/api/pipeline/runs`, `/api/stats`) with typed filters and offset/limit
   pagination.
 - Angular dashboard: Leaflet map with status-colored markers, marker popups
-  with full drone detail, a filter panel (type, status, operator, min battery,
-  date range), and a pipeline control panel with a run-history table.
+  with full drone detail, a filter toolbar of popover chips (type, status,
+  operator, min battery, date range), and a pipeline control panel with a
+  run-history table.
+- Dashboard shell styled as a dark "night-ops console" (IBM Plex Sans
+  Condensed + IBM Plex Mono, loaded via Google Fonts) rather than a generic
+  light admin theme - the bright OSM map reads as the "screen" framed by dark
+  chrome, and an armed filter chip glows with a teal underline. The existing
+  status colors (active/landed/lost_signal/low_battery) are untouched by this
+  and still drive the map markers and pipeline-run badges.
 - Bonus features implemented: low-battery (<20%) and lost-signal markers are
   styled distinctly, the map defaults to showing only the latest position per
   drone (toggleable), clicking a drone draws its historical path, and the
@@ -182,7 +189,7 @@ below and how each phase was scoped against the source skills in
 # Backend (53 tests: validation rules, pipeline outcomes/idempotency/concurrency, sync/async dispatch branching, API filters/pagination/404/422, stats aggregation, latest-per-drone querying)
 cd backend && ./.venv/Scripts/python.exe -m pytest -q
 
-# Frontend (18 tests: service HTTP param building, filter panel, Leaflet map rendering/reactivity, pipeline-run polling)
+# Frontend (34 tests: service HTTP param building, filter panel/filter chip, Leaflet map rendering/reactivity, pipeline-run polling)
 cd frontend && npm test
 ```
 
@@ -221,6 +228,10 @@ cd frontend && npm test
 - **Frontend Dockerfile pins `node:22-alpine`** (not 20, which is below
   Angular 22's minimum supported Node version and fails the container build
   outright - caught by actually running `docker compose up --build`).
+- **IBM Plex Sans Condensed / IBM Plex Mono via a Google Fonts `<link>`**
+  (`frontend/src/index.html`) - the only new external asset added for the
+  console visual identity. A font load, not a runtime dependency; no bundler
+  plugin or npm package was added for it.
 
 ## Project structure
 
